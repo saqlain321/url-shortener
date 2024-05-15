@@ -1,44 +1,53 @@
-// Importing required modules
 const express = require('express');
-const bodyParser = require('body-parser');
+const validUrl = require('valid-url');
 const shortid = require('shortid');
 
-// Initialize Express app
 const app = express();
+const PORT = process.env.PORT || 3000;
 
-// Set up middleware
-app.use(bodyParser.urlencoded({ extended: true }));
-app.use(bodyParser.json());
+// Middleware to parse JSON and URL-encoded bodies
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// In-memory database to store URL mappings
+// In-memory database to store shortened URLs
 const urlDatabase = {};
 
-// Endpoint to create shortened URL
+// Route to shorten a URL
 app.post('/shorten', (req, res) => {
-    const originalUrl = req.body.url;
-    const shortCode = shortid.generate();
-    const shortUrl = `http://localhost:3000/${shortCode}`;
+  const longUrl = req.body.longUrl;
 
-    // Store mapping in database
-    urlDatabase[shortCode] = originalUrl;
+  // Check if the URL is valid
+  if (!validUrl.isUri(longUrl)) {
+    return res.status(400).json({ error: 'Invalid URL' });
+  }
 
-    res.json({ shortUrl });
+  // Generate a short code using shortid
+  const shortCode = shortid.generate();
+
+  // Create the short URL
+  const shortUrl = `http://localhost:${PORT}/${shortCode}`;
+
+  // Store the short URL in the database
+  urlDatabase[shortCode] = longUrl;
+
+  res.json({ shortUrl });
 });
 
-// Endpoint to redirect to original URL
+// Route to redirect to the original URL
 app.get('/:shortCode', (req, res) => {
-    const shortCode = req.params.shortCode;
-    const originalUrl = urlDatabase[shortCode];
+  const shortCode = req.params.shortCode;
+  const longUrl = urlDatabase[shortCode];
 
-    if (originalUrl) {
-        res.redirect(originalUrl);
-    } else {
-        res.status(404).send('URL not found');
-    }
+  // Check if the short code exists in the database
+  if (!longUrl) {
+    return res.status(404).json({ error: 'Short URL not found' });
+  }
+
+  // Redirect to the original URL
+  res.redirect(longUrl);
 });
 
-// Start the server
-const PORT = process.env.PORT || 3000;
+// Start server
 app.listen(PORT, () => {
-    console.log(`Server is running on http://localhost:${PORT}`);
+  console.log(`Server is running on port ${PORT}`);
 });
